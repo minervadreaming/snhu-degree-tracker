@@ -1,0 +1,21 @@
+# Editor and workspace files
+.vscode/
+.idea/
+*.code-workspace
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# User data and exports
+*.csv
+*.json
+*.pdf
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*~
+

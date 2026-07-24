@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#142a52">
+  <title>Degree Compass · SNHU BSBA / MIS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <nav><a class="brand" href="#">Degree <span>Compass</span></a><div class="nav-actions"><button id="exportBtn" class="ghost">Export plan</button><button id="resetBtn" class="ghost danger">Reset</button></div></nav>
+    <div class="hero-grid">
+      <div><p class="eyebrow">SNHU DEGREE PLANNER</p><h1>Your clearest route to<br><em>120 credits.</em></h1><p class="lede">BS in Business Administration · Management Information Systems concentration</p></div>
+      <div class="big-progress"><div class="ring" id="ring"><div><strong id="earnedBig">0</strong><span>of 120 credits</span></div></div><p id="degreeMessage">Start shaping your path below.</p></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="metrics" aria-label="Degree progress">
+      <article><span>Credits earned</span><strong id="earnedMetric">0</strong><small id="remainingMetric">120 remaining</small></article>
+      <article><span>At SNHU</span><strong id="snhuMetric">0</strong><small>30 minimum</small></article>
+      <article><span>Outside SNHU</span><strong id="outsideMetric">0</strong><small>90 maximum</small></article>
+      <article><span>Courses complete</span><strong id="coursesMetric">0</strong><small id="coursesSelected">0 selected</small></article>
+    </section>
+
+    <section class="source-panel">
+      <div class="section-title"><div><p class="eyebrow ink">CREDIT MIX</p><h2>Where your credits come from</h2></div><p class="hint">Only completed courses count toward earned totals.</p></div>
+      <div id="sourceBars" class="source-bars"></div>
+      <div id="alerts"></div>
+    </section>
+
+    <section class="planner-head">
+      <div><p class="eyebrow ink">THE PLAN</p><h2>Build your degree</h2><p>Choose a course, mark its status and assign its source. Changes save automatically in this browser.</p></div>
+      <div class="filters"><label>Show<select id="filter"><option value="all">All courses</option><option value="selected">Selected only</option><option value="complete">Completed only</option><option value="sophia">Sophia options</option></select></label><button id="expandBtn" class="outline">Collapse all</button></div>
+    </section>
+
+    <div id="sections"></div>
+
+    <section class="notes">
+      <div><p class="eyebrow ink">IMPORTANT</p><h2>Plan confidently. Verify officially.</h2></div>
+      <div><p>This is a planning tool, not an official degree audit. SNHU decides how transfer, certificate and Sophia credit applies after evaluation. Equivalencies and catalog requirements can change.</p><p class="links"><a href="https://www.snhu.edu/admission/academic-catalogs#/programs/NyGpX48Ke/HJjbNScIG" target="_blank">Open SNHU catalog ↗</a><a href="https://snhu.sophia.org/" target="_blank">Check Sophia equivalencies ↗</a></p></div>
+    </section>
+  </main>
+
+  <dialog id="exportDialog"><form method="dialog"><button class="close" aria-label="Close">×</button><p class="eyebrow ink">BACKUP</p><h2>Take your plan with you</h2><p>Download a backup you can restore in this tracker, or a spreadsheet-ready CSV.</p><div class="dialog-actions"><button id="jsonBtn" type="button">Download backup</button><button id="csvBtn" type="button" class="outline">Download CSV</button><label class="upload">Restore backup<input id="importInput" type="file" accept=".json,application/json"></label></div></form></dialog>
+  <script src="app.js"></script>
+</body>
+</html>
