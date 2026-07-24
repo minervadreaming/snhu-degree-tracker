@@ -49,7 +49,7 @@ function courseRow(course){
   <select class="status" aria-label="Status">${["Planned","In progress","Completed"].map(v=>`<option ${d.status===v?"selected":""}>${v}</option>`).join("")}</select>
   <select class="source" aria-label="Credit source">${Object.keys(SOURCE_COLORS).map(v=>`<option ${d.source===v?"selected":""}>${v}</option>`).join("")}</select>
   <input class="note" type="text" placeholder="Transfer school, certificate, term…" value="${escapeHtml(d.note||"")}">`;
- if(d.status==="Completed")row.classList.add("status-complete");
+ if(d.selected)row.classList.add(d.status==="Completed"?"status-complete":d.status==="In progress"?"status-progress":"status-planned");
  row.querySelector(".pick").onchange=e=>change(course,"selected",e.target.checked);
  row.querySelector(".status").onchange=e=>change(course,"status",e.target.value);
  row.querySelector(".source").onchange=e=>change(course,"source",e.target.value);
@@ -63,29 +63,29 @@ function courseRow(course){
 function change(course,key,value){state.courses[course.id]??={...course};state.courses[course.id][key]=value;if(key==="status"&&value!=="Planned")state.courses[course.id].selected=true;save();render()}
 function addCustom(section){const id=`custom-${Date.now()}`;const code=prompt("Course code (or requirement label):","ELECTIVE");if(code===null)return;const name=prompt("Course name:","Custom course")||"Custom course";const credits=Math.max(0,Number(prompt("Credit value:","3"))||3);const x={id,section,code,name,credits,sophia:"",selected:true,status:"Planned",source:"Transfer",note:""};state.custom.push(x);state.courses[id]={...x};save();render()}
 function updateMetrics(){
- const items=allCourses().map(dataFor),selected=items.filter(x=>x.selected),complete=items.filter(isEarned),planned=credits(selected),earned=credits(complete);
+ const items=allCourses().map(dataFor),selected=items.filter(x=>x.selected),complete=items.filter(isEarned),plannedItems=selected.filter(x=>x.status==="Planned"),progressItems=selected.filter(x=>x.status==="In progress"),pathCredits=credits(selected),plannedCredits=credits(plannedItems),progressCredits=credits(progressItems),earned=credits(complete);
  const totals=Object.fromEntries(Object.keys(SOURCE_COLORS).map(src=>[src,{planned:credits(selected.filter(x=>x.source===src)),earned:credits(complete.filter(x=>x.source===src))}]));
  const outsidePlanned=totals.Transfer.planned+totals.Certificate.planned+totals.Sophia.planned;
  const outsideEarned=totals.Transfer.earned+totals.Certificate.earned+totals.Sophia.earned;
  const sectionStats=SECTIONS.map(section=>{const sectionItems=allCourses().filter(x=>x.section===section.id).map(dataFor);return{...section,planned:credits(sectionItems.filter(x=>x.selected)),earned:credits(sectionItems.filter(isEarned))}});
  const sectionsPlanned=sectionStats.every(x=>x.planned>=x.required),sectionsEarned=sectionStats.every(x=>x.earned>=x.required);
- const planValid=planned===120&&sectionsPlanned&&totals.SNHU.planned>=30&&outsidePlanned<=90;
+ const planValid=pathCredits===120&&sectionsPlanned&&totals.SNHU.planned>=30&&outsidePlanned<=90;
  const degreeComplete=earned>=120&&sectionsEarned&&totals.SNHU.earned>=30&&outsideEarned<=90;
- q("#plannedBig").textContent=q("#plannedMetric").textContent=planned;q("#earnedBig").textContent=`${earned} earned`;q("#earnedMetric").textContent=earned;
- q("#remainingMetric").textContent=planned<120?`${120-planned} still to plan`:planned===120?"120-credit plan filled":`${planned-120} above degree total`;
- q("#unearnedMetric").textContent=`${Math.max(0,planned-earned)} planned, not yet earned`;
+ q("#plannedBig").textContent=pathCredits;q("#plannedMetric").textContent=plannedCredits;q("#earnedBig").textContent=`${earned} earned`;q("#earnedMetric").textContent=earned;
+ q("#remainingMetric").textContent=`${progressCredits} in progress · ${Math.max(0,120-pathCredits)} still to select`;
+ q("#unearnedMetric").textContent=`${Math.max(0,pathCredits-earned)} selected, not yet earned`;
  q("#snhuMetric").textContent=totals.SNHU.planned;q("#snhuDetail").textContent=`${totals.SNHU.earned} earned · 30 minimum`;
  q("#outsideMetric").textContent=outsidePlanned;q("#outsideDetail").textContent=`${outsideEarned} earned · 90 maximum`;
  q("#courseCounts").textContent=`${selected.length} courses selected · ${complete.length} completed`;
- q("#ring").style.setProperty("--p",Math.min(100,planned/1.2));
- q("#degreeMessage").textContent=degreeComplete?"Degree credit targets reached!":planValid?`Your 120-credit degree path is fully planned.`:planned?`${Math.max(0,120-planned)} credits remain to be planned.`:"Start shaping your path below.";
- q("#sourceBars").innerHTML=Object.entries(totals).map(([src,n])=>`<div class="source-bar"><header><span>${src}</span><strong>${n.planned} planned</strong></header><small>${n.earned} earned</small><div class="track"><div class="plan-fill" style="--c:${SOURCE_COLORS[src]};width:${Math.min(100,n.planned/1.2)}%"><div class="earned-fill" style="width:${n.planned?Math.min(100,n.earned/n.planned*100):0}%"></div></div></div></div>`).join("");
+ q("#ring").style.setProperty("--p",Math.min(100,pathCredits/1.2));
+ q("#degreeMessage").textContent=degreeComplete?"Degree credit targets reached!":planValid?`Your 120-credit degree path is fully selected.`:pathCredits?`${Math.max(0,120-pathCredits)} credits remain to be selected.`:"Start shaping your path below.";
+ q("#sourceBars").innerHTML=Object.entries(totals).map(([src,n])=>`<div class="source-bar"><header><span>${src}</span><strong>${n.planned} selected</strong></header><small>${n.earned} earned</small><div class="track"><div class="plan-fill" style="--c:${SOURCE_COLORS[src]};width:${Math.min(100,n.planned/1.2)}%"><div class="earned-fill" style="width:${n.planned?Math.min(100,n.earned/n.planned*100):0}%"></div></div></div></div>`).join("");
  const alerts=[];
- if(planned>120)alerts.push(`Your plan contains ${planned} credits — ${planned-120} above the 120-credit degree total.`);
+ if(pathCredits>120)alerts.push(`Your plan contains ${pathCredits} credits — ${pathCredits-120} above the 120-credit degree total.`);
  sectionStats.filter(x=>x.planned>x.required).forEach(x=>alerts.push(`${x.name} is planned at ${x.planned} credits, ${x.planned-x.required} above its ${x.required}-credit requirement.`));
  if(outsidePlanned>90)alerts.push(`Your plan has ${outsidePlanned} outside-SNHU credits — ${outsidePlanned-90} above the 90-credit transfer ceiling.`);
  if(totals.SNHU.planned<30)alerts.push(`Plan at least ${30-totals.SNHU.planned} more credits at SNHU to reach the 30-credit residency minimum.`);
- if(planned>=120&&!sectionsPlanned)alerts.push("The total reaches 120, but one or more curriculum sections still need planned credits.");
+ if(pathCredits>=120&&!sectionsPlanned)alerts.push("The total reaches 120, but one or more curriculum sections still need selected credits.");
  if(!alerts.length&&planValid)alerts.push("Your selected courses form a valid 120-credit plan with the required SNHU residency.");
  q("#alerts").innerHTML=alerts.map(x=>`<div class="alert ${planValid&&!x.includes("above")&&!x.includes("need")?"ok":""}">${x}</div>`).join("");
 }
