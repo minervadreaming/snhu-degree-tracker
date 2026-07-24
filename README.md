@@ -13,6 +13,7 @@ concentration.
 - Tracks planned, in-progress, and completed courses
 - Separates SNHU, transfer, certificate, and Sophia Learning credits
 - Monitors the 120-credit degree total
+- Tracks selected planned credits separately from completed, earned credits
 - Monitors the 30-credit SNHU residency minimum and 90-credit transfer maximum
 - Supports editable free electives and custom courses
 - Exports plans as JSON backups or CSV files
@@ -38,4 +39,3 @@ This project is an independent planning tool, not an official SNHU degree
 audit. SNHU determines how transfer, certificate, Sophia Learning, and other
 prior-learning credits apply to a student's program. Confirm current
 requirements and equivalencies with an SNHU academic advisor.
-

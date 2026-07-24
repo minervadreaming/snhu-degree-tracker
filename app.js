@@ -21,12 +21,13 @@ function save(){localStorage.setItem("degreeCompass",JSON.stringify(state))}
 function allCourses(){return SECTIONS.flatMap(s=>s.courses.map(x=>({...x,section:s.id,custom:false}))).concat(state.custom.map(x=>({...x,custom:true})))}
 function dataFor(course){return state.courses[course.id]||course}
 function isEarned(d){return d.selected&&d.status==="Completed"}
+function credits(items){return items.reduce((n,x)=>n+(+x.credits||0),0)}
 function render(){
  const host=document.querySelector("#sections");host.innerHTML="";
  SECTIONS.forEach((section,idx)=>{
-  const items=allCourses().filter(x=>x.section===section.id);const earned=items.reduce((n,x)=>n+(isEarned(dataFor(x))?+dataFor(x).credits:0),0);
+  const items=allCourses().filter(x=>x.section===section.id),itemData=items.map(dataFor),planned=credits(itemData.filter(x=>x.selected)),earned=credits(itemData.filter(isEarned));
   const wrap=document.createElement("section");wrap.className="degree-section";wrap.dataset.section=section.id;
-  wrap.innerHTML=`<button class="section-toggle"><span class="section-num">0${idx+1}</span><span class="section-name"><strong>${section.name}</strong><small>${section.note}</small></span><span class="section-progress"><strong>${earned}/${section.required}</strong><small> credits</small></span><span class="chev">⌄</span></button><div class="course-list"></div>`;
+  wrap.innerHTML=`<button class="section-toggle"><span class="section-num">0${idx+1}</span><span class="section-name"><strong>${section.name}</strong><small>${section.note}</small></span><span class="section-progress"><strong>${planned}/${section.required}</strong><small>${earned} earned${planned>section.required?` · ${planned-section.required} over`:""}</small></span><span class="chev">⌄</span></button><div class="course-list"></div>`;
   const list=wrap.querySelector(".course-list");items.forEach(x=>list.appendChild(courseRow(x)));
   list.insertAdjacentHTML("beforeend",`<div class="add-row"><button class="add-course">＋ Add a custom course</button></div>`);
   wrap.querySelector(".section-toggle").onclick=()=>wrap.classList.toggle("closed");
@@ -62,13 +63,31 @@ function courseRow(course){
 function change(course,key,value){state.courses[course.id]??={...course};state.courses[course.id][key]=value;if(key==="status"&&value!=="Planned")state.courses[course.id].selected=true;save();render()}
 function addCustom(section){const id=`custom-${Date.now()}`;const code=prompt("Course code (or requirement label):","ELECTIVE");if(code===null)return;const name=prompt("Course name:","Custom course")||"Custom course";const credits=Math.max(0,Number(prompt("Credit value:","3"))||3);const x={id,section,code,name,credits,sophia:"",selected:true,status:"Planned",source:"Transfer",note:""};state.custom.push(x);state.courses[id]={...x};save();render()}
 function updateMetrics(){
- const items=allCourses().map(dataFor),selected=items.filter(x=>x.selected),complete=items.filter(isEarned),earned=complete.reduce((n,x)=>n+(+x.credits||0),0);
- const totals=Object.fromEntries(Object.keys(SOURCE_COLORS).map(src=>[src,complete.filter(x=>x.source===src).reduce((n,x)=>n+(+x.credits||0),0)]));
- const outside=totals.Transfer+totals.Certificate+totals.Sophia;
- q("#earnedBig").textContent=q("#earnedMetric").textContent=earned;q("#remainingMetric").textContent=`${Math.max(0,120-earned)} remaining`;q("#snhuMetric").textContent=totals.SNHU;q("#outsideMetric").textContent=outside;q("#coursesMetric").textContent=complete.length;q("#coursesSelected").textContent=`${selected.length} selected`;q("#ring").style.setProperty("--p",Math.min(100,earned/1.2));q("#degreeMessage").textContent=earned>=120&&totals.SNHU>=30?"Degree credit targets reached!":earned?`${Math.max(0,120-earned)} credits remain on your route.`:"Start shaping your path below.";
- q("#sourceBars").innerHTML=Object.entries(totals).map(([src,n])=>`<div class="source-bar"><header><span>${src}</span><strong>${n} cr</strong></header><div class="track"><div class="fill" style="--c:${SOURCE_COLORS[src]};width:${Math.min(100,n/1.2)}%"></div></div></div>`).join("");
- const alerts=[];if(outside>90)alerts.push(`Outside credit is ${outside} — ${outside-90} credits above SNHU’s 90-credit transfer ceiling.`);if(earned>=120&&totals.SNHU<30)alerts.push(`You still need ${30-totals.SNHU} more completed SNHU credits to meet the residency minimum.`);if(!alerts.length&&earned>=120&&totals.SNHU>=30)alerts.push("Your plan meets the 120-credit total and 30-credit SNHU minimum.");
- q("#alerts").innerHTML=alerts.map(x=>`<div class="alert ${earned>=120&&totals.SNHU>=30?"ok":""}">${x}</div>`).join("");
+ const items=allCourses().map(dataFor),selected=items.filter(x=>x.selected),complete=items.filter(isEarned),planned=credits(selected),earned=credits(complete);
+ const totals=Object.fromEntries(Object.keys(SOURCE_COLORS).map(src=>[src,{planned:credits(selected.filter(x=>x.source===src)),earned:credits(complete.filter(x=>x.source===src))}]));
+ const outsidePlanned=totals.Transfer.planned+totals.Certificate.planned+totals.Sophia.planned;
+ const outsideEarned=totals.Transfer.earned+totals.Certificate.earned+totals.Sophia.earned;
+ const sectionStats=SECTIONS.map(section=>{const sectionItems=allCourses().filter(x=>x.section===section.id).map(dataFor);return{...section,planned:credits(sectionItems.filter(x=>x.selected)),earned:credits(sectionItems.filter(isEarned))}});
+ const sectionsPlanned=sectionStats.every(x=>x.planned>=x.required),sectionsEarned=sectionStats.every(x=>x.earned>=x.required);
+ const planValid=planned===120&&sectionsPlanned&&totals.SNHU.planned>=30&&outsidePlanned<=90;
+ const degreeComplete=earned>=120&&sectionsEarned&&totals.SNHU.earned>=30&&outsideEarned<=90;
+ q("#plannedBig").textContent=q("#plannedMetric").textContent=planned;q("#earnedBig").textContent=`${earned} earned`;q("#earnedMetric").textContent=earned;
+ q("#remainingMetric").textContent=planned<120?`${120-planned} still to plan`:planned===120?"120-credit plan filled":`${planned-120} above degree total`;
+ q("#unearnedMetric").textContent=`${Math.max(0,planned-earned)} planned, not yet earned`;
+ q("#snhuMetric").textContent=totals.SNHU.planned;q("#snhuDetail").textContent=`${totals.SNHU.earned} earned · 30 minimum`;
+ q("#outsideMetric").textContent=outsidePlanned;q("#outsideDetail").textContent=`${outsideEarned} earned · 90 maximum`;
+ q("#courseCounts").textContent=`${selected.length} courses selected · ${complete.length} completed`;
+ q("#ring").style.setProperty("--p",Math.min(100,planned/1.2));
+ q("#degreeMessage").textContent=degreeComplete?"Degree credit targets reached!":planValid?`Your 120-credit degree path is fully planned.`:planned?`${Math.max(0,120-planned)} credits remain to be planned.`:"Start shaping your path below.";
+ q("#sourceBars").innerHTML=Object.entries(totals).map(([src,n])=>`<div class="source-bar"><header><span>${src}</span><strong>${n.planned} planned</strong></header><small>${n.earned} earned</small><div class="track"><div class="plan-fill" style="--c:${SOURCE_COLORS[src]};width:${Math.min(100,n.planned/1.2)}%"><div class="earned-fill" style="width:${n.planned?Math.min(100,n.earned/n.planned*100):0}%"></div></div></div></div>`).join("");
+ const alerts=[];
+ if(planned>120)alerts.push(`Your plan contains ${planned} credits — ${planned-120} above the 120-credit degree total.`);
+ sectionStats.filter(x=>x.planned>x.required).forEach(x=>alerts.push(`${x.name} is planned at ${x.planned} credits, ${x.planned-x.required} above its ${x.required}-credit requirement.`));
+ if(outsidePlanned>90)alerts.push(`Your plan has ${outsidePlanned} outside-SNHU credits — ${outsidePlanned-90} above the 90-credit transfer ceiling.`);
+ if(totals.SNHU.planned<30)alerts.push(`Plan at least ${30-totals.SNHU.planned} more credits at SNHU to reach the 30-credit residency minimum.`);
+ if(planned>=120&&!sectionsPlanned)alerts.push("The total reaches 120, but one or more curriculum sections still need planned credits.");
+ if(!alerts.length&&planValid)alerts.push("Your selected courses form a valid 120-credit plan with the required SNHU residency.");
+ q("#alerts").innerHTML=alerts.map(x=>`<div class="alert ${planValid&&!x.includes("above")&&!x.includes("need")?"ok":""}">${x}</div>`).join("");
 }
 function applyFilter(){const f=q("#filter").value;document.querySelectorAll(".course-row").forEach(row=>{const course=allCourses().find(x=>x.id===row.dataset.id),d=dataFor(course);row.classList.toggle("hidden",f==="selected"&&!d.selected||f==="complete"&&!isEarned(d)||f==="sophia"&&!(d.sophia||course.sophia))})}
 function download(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
