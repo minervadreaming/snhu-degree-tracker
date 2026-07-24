@@ -19,6 +19,7 @@
   <main>
     <section class="metrics" aria-label="Degree progress">
       <article><span>Credits planned</span><strong id="plannedMetric">0</strong><small id="remainingMetric">0 in progress · 120 still to select</small></article>
+      <article><span>Credits in progress</span><strong id="progressMetric">0</strong><small id="progressDetail">0 courses currently underway</small></article>
       <article><span>Credits earned</span><strong id="earnedMetric">0</strong><small id="unearnedMetric">0 planned, not yet earned</small></article>
       <article><span>Selected at SNHU</span><strong id="snhuMetric">0</strong><small id="snhuDetail">0 earned · 30 minimum</small></article>
       <article><span>Selected outside SNHU</span><strong id="outsideMetric">0</strong><small id="outsideDetail">0 earned · 90 maximum</small></article>
@@ -32,7 +33,7 @@
 
     <section class="planner-head">
       <div><p class="eyebrow ink">THE PLAN</p><h2>Build your degree</h2><p>Choose a course, mark its status and assign its source. Changes save automatically in this browser.</p></div>
-      <div class="filters"><label>Show<select id="filter"><option value="all">All courses</option><option value="selected">Selected only</option><option value="complete">Completed only</option><option value="sophia">Sophia options</option></select></label><button id="expandBtn" class="outline">Collapse all</button></div>
+      <div class="filters"><label>Show<select id="filter"><option value="all">All courses</option><option value="selected">Selected only</option><option value="progress">In progress only</option><option value="complete">Completed only</option><option value="sophia">Sophia options</option></select></label><button id="expandBtn" class="outline">Collapse all</button></div>
     </section>
 
     <div id="sections"></div>
