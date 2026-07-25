@@ -22,7 +22,13 @@
   test("Existing version-2 local data survives migration", () => {
     const old = demo(); old.schemaVersion = 2; old.student.name = "Local User";
     const storage = new MemoryStorage({ [DegreePrivacy.KEYS.v2]: JSON.stringify(old) }), loaded = DegreePrivacy.load(storage);
-    eq(loaded.state.student.name, "Local User"); eq(loaded.state.schemaVersion, 3); eq(loaded.state.meta.origin, "migrated-local");
+    eq(loaded.state.student.name, "Local User"); eq(loaded.state.schemaVersion, 4); eq(loaded.state.meta.origin, "migrated-local");
+  });
+  test("Version-3 plans gain provider candidates without losing selections", () => {
+    const old = demo(), selectedBefore = DegreeEngine.audit(old).selectedCredits; old.schemaVersion = 3;
+    const migrated = DegreeEngine.migrate(old);
+    eq(migrated.schemaVersion, 4); eq(DegreeEngine.audit(migrated).selectedCredits, selectedBefore);
+    ok(migrated.requirements.some(r => r.options.some(o => o.provider === "Study.com")), "Study.com candidates missing");
   });
   test("Failed migration restores the exact prior browser records", () => {
     const broken = "{not valid json", storage = new MemoryStorage({ [DegreePrivacy.KEYS.v2]: broken });
@@ -38,7 +44,7 @@
   });
   test("Export serializes locally without a network request", () => {
     let calls = 0; const priorFetch = window.fetch; window.fetch = () => { calls++; };
-    try { ok(DegreePrivacy.exportJson(blank()).includes('"schemaVersion": 3'), "export missing schema"); eq(calls, 0); } finally { window.fetch = priorFetch; }
+    try { ok(DegreePrivacy.exportJson(blank()).includes('"schemaVersion": 4'), "export missing schema"); eq(calls, 0); } finally { window.fetch = priorFetch; }
   });
   test("Delete removes every known local plan key", () => {
     const storage = new MemoryStorage(Object.fromEntries(Object.values(DegreePrivacy.KEYS).map(k => [k, "data"])));
@@ -53,7 +59,7 @@
     let calls = 0; const priorFetch = window.fetch; window.fetch = () => { calls++; };
     try { DegreeEngine.audit(demo()); DegreeEngine.estimate(demo()); DegreeEngine.generatePlan(blank(), "balanced"); DegreePrivacy.exportJson(demo()); eq(calls, 0); } finally { window.fetch = priorFetch; }
   });
-  test("Invalid imported data is rejected", () => { let rejected = false; try { DegreePrivacy.importJson('{"schemaVersion":3,"requirements":[]}'); } catch { rejected = true; } ok(rejected, "invalid import accepted"); });
+  test("Invalid imported data is rejected", () => { let rejected = false; try { DegreePrivacy.importJson('{"schemaVersion":4,"requirements":[]}'); } catch { rejected = true; } ok(rejected, "invalid import accepted"); });
   test("Production modules do not reference local private-development paths", () => {
     [...document.querySelectorAll("script[src]")].forEach(el => ok(!/private-data|private-seeds|local-backups/i.test(el.src), "private path imported"));
   });
@@ -73,6 +79,24 @@
   });
   test("Duplicate credential assignment is detected", () => {
     const s = completePlan(); ["free-5","free-6"].forEach(id => { const r = s.requirements.find(x => x.id === id), o = DegreeData.option(`${id}-credential`, "Credential", "DEMO", "Fictional credential", "Confirmed", { credentialId: "same-credential" }); r.options.push(o); r.selectedOptionId = o.id; }); eq(DegreeEngine.audit(s).duplicateAssignments.length, 1);
+  });
+  test("Sophia-heavy plan materially differs from SNHU-heavy plan", () => {
+    const sophia = DegreeEngine.audit(DegreeEngine.generatePlan(blank(), "sophia-heavy"));
+    const snhu = DegreeEngine.audit(DegreeEngine.generatePlan(blank(), "snhu-heavy"));
+    ok((sophia.byProvider.Sophia?.selected || 0) > 0, "Sophia-heavy plan selected no Sophia credits");
+    ok((sophia.byProvider.SNHU?.selected || 0) < (snhu.byProvider.SNHU?.selected || 0), "provider mixes did not differ");
+    ok(sophia.snhuSelected >= 30 && sophia.majorSnhu >= 12, "Sophia plan broke residency");
+    eq(sophia.pathStatus, "Provisional");
+  });
+  test("Study.com-heavy plan selects Study.com candidates and remains provisional", () => {
+    const a = DegreeEngine.audit(DegreeEngine.generatePlan(blank(), "study-heavy"));
+    ok((a.byProvider["Study.com"]?.selected || 0) > 0, "Study.com-heavy plan selected no Study.com credits");
+    eq(a.pathStatus, "Provisional");
+  });
+  test("Generated scenarios retain per-requirement statuses", () => {
+    const s = DegreeEngine.generatePlan(blank(), "sophia-heavy"), scenario = s.scenarios[0];
+    ok(Object.keys(scenario.statuses).length > 0, "scenario statuses were not stored");
+    eq(scenario.statuses[Object.keys(scenario.statuses)[0]], "Planned");
   });
 
   const results = document.querySelector("#results"); let passed = 0;

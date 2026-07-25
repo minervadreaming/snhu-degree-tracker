@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  const KEYS = { current: "degreeOptimizerV3", v2: "degreeOptimizerV2", v1: "degreeCompass" };
+  const KEYS = { current: "degreeOptimizerV4", v3: "degreeOptimizerV3", v2: "degreeOptimizerV2", v1: "degreeCompass" };
   const clone = value => JSON.parse(JSON.stringify(value));
 
   function safeParse(text) {
@@ -18,7 +18,7 @@
 
   function load(storage) {
     const memoryBackup = Object.fromEntries(Object.values(KEYS).map(key => [key, storage.getItem(key)]));
-    const sourceKey = memoryBackup[KEYS.current] ? KEYS.current : memoryBackup[KEYS.v2] ? KEYS.v2 : memoryBackup[KEYS.v1] ? KEYS.v1 : "";
+    const sourceKey = memoryBackup[KEYS.current] ? KEYS.current : memoryBackup[KEYS.v3] ? KEYS.v3 : memoryBackup[KEYS.v2] ? KEYS.v2 : memoryBackup[KEYS.v1] ? KEYS.v1 : "";
     if (!sourceKey) return { state: null, firstRun: true, migrated: false, error: "" };
     try {
       const state = validateAndMigrate(safeParse(memoryBackup[sourceKey]));

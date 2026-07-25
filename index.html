@@ -65,14 +65,15 @@
 
     <section class="tab-page" data-page="planner">
       <section class="panel optimizer-head"><div><p class="eyebrow ink">DETERMINISTIC OPTIMIZER</p><h2>Generate a complete path</h2><p>Locked selections stay fixed. Ineligible and excluded options are never chosen. Residency is enforced after mode scoring.</p></div>
-        <label>Planning mode<select id="plannerMode"><option value="balanced">Balanced</option><option value="fastest">Fastest</option><option value="lowest-cost">Lowest cost</option><option value="fewest-providers">Fewest providers</option><option value="max-transfer">Maximum transfer</option><option value="conservative">Conservative / confirmed only</option><option value="custom">Custom priorities</option></select></label>
+        <label>Planning mode<select id="plannerMode"><option value="balanced">Balanced</option><option value="fastest">Fastest</option><option value="lowest-cost">Lowest cost</option><option value="sophia-heavy">Sophia-heavy</option><option value="study-heavy">Study.com-heavy</option><option value="snhu-heavy">SNHU-heavy</option><option value="fewest-providers">Fewest providers</option><option value="max-transfer">Maximum transfer</option><option value="conservative">Conservative / confirmed only</option><option value="custom">Custom priorities</option></select></label>
         <button id="generateBtn">Generate plan</button></section>
       <section class="split"><article class="panel"><h2>Projected cost & effort</h2><div id="estimate"></div></article><article class="panel"><h2>Plan safeguards</h2><div id="optimizerRules"></div></article></section>
       <section class="panel"><h2>Recommended order</h2><div id="fullSequence"></div></section>
     </section>
 
     <section class="tab-page" data-page="scenarios">
-      <section class="planner-head"><div><p class="eyebrow ink">WHAT-IF PLANS</p><h2>Compare scenarios</h2><p>Each scenario stores its own selections, locks, exclusions, and mode.</p></div><button id="newScenarioBtn">New scenario</button></section>
+      <section class="planner-head"><div><p class="eyebrow ink">WHAT-IF PLANS</p><h2>Compare scenarios</h2><p>Each scenario stores its own selections, statuses, locks, exclusions, and mode. Unverified provider candidates remain provisional until you enter and confirm the exact equivalent.</p></div><button id="newScenarioBtn">Duplicate active</button></section>
+      <div class="preset-bar" aria-label="Create scenario preset"><span>Create preset:</span><button data-preset="sophia-heavy">Sophia-heavy</button><button data-preset="study-heavy">Study.com-heavy</button><button data-preset="snhu-heavy">SNHU-heavy</button><button data-preset="fastest">Fastest</button><button data-preset="lowest-cost">Lowest cost</button><button data-preset="conservative">Confirmed only</button></div>
       <div id="scenarioList" class="scenario-grid"></div>
     </section>
 

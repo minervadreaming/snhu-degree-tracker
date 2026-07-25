@@ -30,7 +30,7 @@ A new visitor must explicitly choose to:
 2. import a local JSON backup; or
 3. load fictional demo data.
 
-Persisted schema version 3 is separate from public defaults. Existing version-1 or version-2 browser records are migrated locally. The migration keeps an in-memory copy, validates the result, writes only after success, and restores the prior records if an error occurs.
+Persisted schema version 4 is separate from public defaults. Existing version-1, version-2, or version-3 browser records are migrated locally. The migration keeps an in-memory copy, validates the result, writes only after success, and restores the prior records if an error occurs.
 
 ## Features
 

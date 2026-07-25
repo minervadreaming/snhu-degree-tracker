@@ -16,6 +16,41 @@
   });
 
   const snhu = (id, code, title, extra) => option(`${id}-snhu`, "SNHU", code, title, "Confirmed", extra);
+  function ensureProviderCandidates(requirements) {
+    requirements.forEach(r => {
+      if (r.residencySensitive || r.special) return;
+      const candidates = [
+        ["Sophia", "sophia", 25, 30],
+        ["Study.com", "study", 35, 45]
+      ];
+      candidates.forEach(([provider, suffix, hours, days]) => {
+        const existing = r.options.find(o => o.provider === provider);
+        if (existing) {
+          if (existing.verification !== "Confirmed") {
+            existing.baselineHours ??= hours;
+            existing.expectedDays ??= days;
+            existing.candidate = true;
+          }
+          return;
+        }
+        r.options.push(option(
+          `${r.id}-${suffix}-candidate`,
+          provider,
+          "ENTER COURSE",
+          `Candidate ${provider} course — verify equivalency`,
+          "Unverified",
+          {
+            candidate: true,
+            baselineHours: hours,
+            expectedDays: days,
+            snhuEquivalent: r.code,
+            notes: `Planning placeholder only. Enter the current ${provider} course and verify its SNHU application before relying on it.`
+          }
+        ));
+      });
+    });
+    return requirements;
+  }
 
   function createRequirements() {
     const completed = [
@@ -84,12 +119,12 @@
         options: [snhu(id, "ELECTIVE", `SNHU free elective ${n}`)]
       });
     });
-    return [...completed, ...gen, ...core, ...mis, ...free];
+    return ensureProviderCandidates([...completed, ...gen, ...core, ...mis, ...free]);
   }
 
   function blank() {
     return {
-      schemaVersion: 3,
+      schemaVersion: 4,
       meta: { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), migratedFrom: null, origin: "blank" },
       student: { name: "", studentId: "", program: "BS Business Administration — Management Information Systems", catalog: "2026 C-5" },
       program: { totalCredits: 120, transferMaximum: 90, snhuMinimum: 30, majorResidencyMinimum: 12, categoryCredits: { gened: 42, core: 30, mis: 15, free: 33 } },
@@ -100,7 +135,7 @@
         candidateEquivalencies: [], verification: "Advisor confirmation required",
         notes: "Record an earned professional credential locally, then confirm its credit value and degree application with an advisor."
       }],
-      scenarios: [{ id: "baseline", name: "Current plan", mode: "balanced", selections: {}, locks: [], exclusions: [], overrides: {}, createdAt: new Date().toISOString() }],
+      scenarios: [{ id: "baseline", name: "Current plan", mode: "balanced", selections: {}, statuses: {}, locks: [], exclusions: [], overrides: {}, createdAt: new Date().toISOString() }],
       activeScenarioId: "baseline",
       verificationQueue: [
         "Which exact SNHU requirement will the PMP satisfy?",
@@ -146,5 +181,5 @@
     return state;
   }
 
-  window.DegreeData = { blank, demo, seed: blank, option, requirement, categories: { gened: "General Education · The Commons", core: "Business Core", mis: "MIS Concentration", free: "Free Electives" } };
+  window.DegreeData = { blank, demo, seed: blank, option, requirement, ensureProviderCandidates, categories: { gened: "General Education · The Commons", core: "Business Core", mis: "MIS Concentration", free: "Free Electives" } };
 })();

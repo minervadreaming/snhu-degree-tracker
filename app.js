@@ -184,22 +184,54 @@
   }
 
   function renderScenarios() {
-    const baseAudit = DegreeEngine.audit(state);
-    q("#scenarioList").innerHTML = state.scenarios.map(s => `<article class="panel scenario ${s.id === state.activeScenarioId ? "active" : ""}"><span class="badge">${s.id === state.activeScenarioId ? "Active" : "Saved"}</span><h2>${esc(s.name)}</h2><p>Mode: ${esc(s.mode)} · ${Object.keys(s.selections).length || baseAudit.selectedCredits / 3} requirements selected</p><p>${s.locks.length} locks · ${s.exclusions.length} exclusions</p><div class="row-actions"><button data-activate="${s.id}">Activate</button><button class="outline" data-rename="${s.id}">Rename</button><button class="outline" data-duplicate="${s.id}">Duplicate</button>${s.id !== "baseline" ? `<button class="outline danger" data-delete="${s.id}">Delete</button>` : ""}</div></article>`).join("");
+    snapshotScenario(activeScenario());
+    q("#scenarioList").innerHTML = state.scenarios.map(s => {
+      const scenarioState = stateForScenario(s), a = DegreeEngine.audit(scenarioState), e = DegreeEngine.estimate(scenarioState);
+      const providerCounts = Object.fromEntries(Object.entries(a.byProvider).map(([name, x]) => [name, Math.round(x.selected / 3)]));
+      const unresolved = scenarioState.requirements.filter(r => DegreeEngine.selected(r) && DegreeEngine.optionFor(r)?.verification !== "Confirmed").length;
+      return `<article class="panel scenario ${s.id === state.activeScenarioId ? "active" : ""}">
+        <span class="badge">${s.id === state.activeScenarioId ? "Active" : "Saved"}</span><span class="badge ${a.pathStatus.toLowerCase()}">${a.pathStatus}</span>
+        <h2>${esc(s.name)}</h2><p>Mode: ${esc(s.mode)}</p>
+        <div class="scenario-metrics"><span><strong>${a.selectedCredits}</strong> credits</span><span><strong>${money(e.cost)}</strong> cost</span><span><strong>${e.expectedDays}</strong> days</span><span><strong>${a.snhuSelected}</strong> SNHU cr</span><span><strong>${a.majorSnhu}</strong> major cr</span><span><strong>${unresolved}</strong> unresolved</span></div>
+        <p class="provider-mix">${Object.entries(providerCounts).map(([name, count]) => `${esc(name)} ${count}`).join(" · ") || "No courses selected"}</p>
+        <p>${s.locks.length} locks · ${s.exclusions.length} exclusions</p>
+        <div class="row-actions"><button data-activate="${s.id}">Activate</button><button class="outline" data-rename="${s.id}">Rename</button><button class="outline" data-duplicate="${s.id}">Duplicate</button>${s.id !== "baseline" ? `<button class="outline danger" data-delete="${s.id}">Delete</button>` : ""}</div>
+      </article>`;
+    }).join("");
     qa("[data-activate]").forEach(b => b.onclick = () => activateScenario(b.dataset.activate));
     qa("[data-duplicate]").forEach(b => b.onclick = () => duplicateScenario(b.dataset.duplicate));
     qa("[data-rename]").forEach(b => b.onclick = () => { const s = state.scenarios.find(x => x.id === b.dataset.rename), name = prompt("Scenario name:", s.name); if (name?.trim()) { s.name = name.trim(); save(); renderScenarios(); } });
     qa("[data-delete]").forEach(b => b.onclick = () => { state.scenarios = state.scenarios.filter(s => s.id !== b.dataset.delete); if (state.activeScenarioId === b.dataset.delete) state.activeScenarioId = "baseline"; save(); render(); });
   }
-  function snapshotScenario(s) { s.selections = Object.fromEntries(state.requirements.filter(DegreeEngine.selected).map(r => [r.id, r.selectedOptionId])); }
+  function snapshotScenario(s) {
+    if (!s) return;
+    s.selections = Object.fromEntries(state.requirements.filter(DegreeEngine.selected).map(r => [r.id, r.selectedOptionId]));
+    s.statuses = Object.fromEntries(state.requirements.filter(DegreeEngine.selected).map(r => [r.id, r.status]));
+  }
+  function stateForScenario(s) {
+    if (s.id === state.activeScenarioId) return DegreeEngine.clone(state);
+    const copy = DegreeEngine.clone(state);
+    copy.requirements.filter(r => r.status !== "Completed").forEach(r => {
+      r.selectedOptionId = s.selections?.[r.id] || "";
+      r.status = r.selectedOptionId ? (s.statuses?.[r.id] || "Planned") : "Available";
+    });
+    return copy;
+  }
   function activateScenario(id) {
     snapshotScenario(activeScenario()); const s = state.scenarios.find(x => x.id === id); state.activeScenarioId = id;
-    state.requirements.filter(r => r.status !== "Completed").forEach(r => { r.selectedOptionId = s.selections[r.id] || ""; r.status = r.selectedOptionId ? "Planned" : "Available"; });
+    state.requirements.filter(r => r.status !== "Completed").forEach(r => { r.selectedOptionId = s.selections?.[r.id] || ""; r.status = r.selectedOptionId ? (s.statuses?.[r.id] || "Planned") : "Available"; });
     save(); render();
   }
   function duplicateScenario(id) {
     const source = state.scenarios.find(s => s.id === id), name = prompt("Scenario name:", `${source.name} copy`); if (!name) return;
     const copy = DegreeEngine.clone(source); copy.id = `scenario-${Date.now()}`; copy.name = name; copy.createdAt = new Date().toISOString(); state.scenarios.push(copy); save(); render();
+  }
+  function createPreset(mode) {
+    snapshotScenario(activeScenario());
+    const names = { "sophia-heavy": "Sophia-heavy plan", "study-heavy": "Study.com-heavy plan", "snhu-heavy": "SNHU-heavy plan", fastest: "Fastest plan", "lowest-cost": "Lowest-cost plan", conservative: "Confirmed-only plan" };
+    const scenario = { id: `scenario-${Date.now()}`, name: names[mode] || mode, mode, selections: {}, statuses: {}, locks: [], exclusions: [], overrides: {}, createdAt: new Date().toISOString() };
+    state.scenarios.push(scenario); state.activeScenarioId = scenario.id;
+    state = DegreeEngine.generatePlan(state, mode); save(); render();
   }
 
   function renderQueue() {
@@ -219,7 +251,7 @@
   }
 
   function render() {
-    if (migrated) { q("#migrationNotice").classList.remove("hidden"); q("#migrationNotice").textContent = "Your earlier browser-only plan was migrated to schema version 3. The prior storage record remains available as a fallback."; migrated = false; }
+    if (migrated) { q("#migrationNotice").classList.remove("hidden"); q("#migrationNotice").textContent = "Your earlier browser-only plan was migrated to schema version 4. The prior storage record remains available as a fallback."; migrated = false; }
     renderOverview(); renderRequirements(); renderPlanner(); renderScenarios(); renderQueue(); renderSettings(); setTab(state.ui.tab || "overview");
   }
 
@@ -266,6 +298,7 @@
   q("#categoryFilter").onchange = renderRequirements; q("#statusFilter").onchange = renderRequirements;
   q("#generateBtn").onclick = () => { state = DegreeEngine.generatePlan(state, q("#plannerMode").value); save(); render(); };
   q("#newScenarioBtn").onclick = () => { snapshotScenario(activeScenario()); duplicateScenario(state.activeScenarioId); };
+  qa("[data-preset]").forEach(button => button.onclick = () => createPreset(button.dataset.preset));
   q("#exportBtn").onclick = () => q("#exportDialog").showModal();
   q("#privacyLink").onclick = () => setTab("privacy");
   q("#jsonBtn").onclick = () => download("degree-plan-local-backup.json", DegreePrivacy.exportJson(state), "application/json");

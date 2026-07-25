@@ -10,7 +10,7 @@
   function validate(state) {
     const errors = [], warnings = [];
     if (!state || typeof state !== "object") return { valid: false, errors: ["Backup is not an object."], warnings };
-    if (state.schemaVersion !== 3) errors.push(`Unsupported schema version: ${state.schemaVersion ?? "missing"}.`);
+    if (state.schemaVersion !== 4) errors.push(`Unsupported schema version: ${state.schemaVersion ?? "missing"}.`);
     if (!Array.isArray(state.requirements)) errors.push("Requirements must be an array.");
     if (!state.student || typeof state.student !== "object") errors.push("Student profile is missing.");
     if (!state.program || +state.program.totalCredits !== 120) errors.push("Program definition is missing or unsupported.");
@@ -32,12 +32,17 @@
   }
 
   function migrate(old) {
-    if (old?.schemaVersion === 3) return clone(old);
-    if (old?.schemaVersion === 2) {
+    if (old?.schemaVersion === 4) {
       const next = clone(old);
-      next.schemaVersion = 3;
+      window.DegreeData.ensureProviderCandidates(next.requirements);
+      next.scenarios?.forEach(s => { s.statuses ||= {}; });
+      return next;
+    }
+    if (old?.schemaVersion === 3 || old?.schemaVersion === 2) {
+      const next = clone(old);
+      next.schemaVersion = 4;
       next.meta ||= {};
-      next.meta.migratedFrom = "degreeOptimizerV2";
+      next.meta.migratedFrom = `degreeOptimizerV${old.schemaVersion}`;
       next.meta.origin = "migrated-local";
       next.meta.updatedAt = new Date().toISOString();
       next.student ||= {};
@@ -51,6 +56,8 @@
           if (o.verification === "Rejected") o.verification = "Not eligible";
         });
       });
+      window.DegreeData.ensureProviderCandidates(next.requirements);
+      next.scenarios?.forEach(s => { s.statuses ||= {}; });
       const defaults = window.DegreeData.blank().settings;
       next.settings = { ...defaults, ...(next.settings || {}), providers: { ...defaults.providers, ...(next.settings?.providers || {}) } };
       return next;
@@ -137,7 +144,9 @@
   function score(o, mode, state, providerCounts) {
     const s = state.settings, provider = s.providers[o.provider] || {};
     const cost = o.cost ?? (provider.pricingModel === "perCredit" ? provider.price * o.credits : provider.price) ?? 0;
-    const days = o.days ?? s.defaultCourseDays, hours = o.hours ?? s.defaultCourseHours;
+    const days = o.expectedDays ?? o.days ?? s.defaultCourseDays, hours = o.hours ?? o.baselineHours ?? s.defaultCourseHours;
+    const heavyProvider = { "sophia-heavy": "Sophia", "study-heavy": "Study.com", "snhu-heavy": "SNHU" }[mode];
+    if (heavyProvider) return (o.provider === heavyProvider ? -10000 : 10000) + days + cost / 100;
     if (mode === "fastest") return days + o.gradingDelayDays + hours / 10;
     if (mode === "lowest-cost") return cost + days / 1000;
     if (mode === "fewest-providers") return (providerCounts[o.provider] || 0) ? 0 : 1000;
@@ -170,6 +179,7 @@
     if (scenario) {
       scenario.mode = mode;
       scenario.selections = Object.fromEntries(next.requirements.filter(selected).map(r => [r.id, r.selectedOptionId]));
+      scenario.statuses = Object.fromEntries(next.requirements.filter(selected).map(r => [r.id, r.status]));
     }
     next.meta.updatedAt = new Date().toISOString();
     return next;
