@@ -93,6 +93,20 @@
     ok((a.byProvider["Study.com"]?.selected || 0) > 0, "Study.com-heavy plan selected no Study.com credits");
     eq(a.pathStatus, "Provisional");
   });
+  test("Official SNHU Sophia mappings replace generic placeholders when available", () => {
+    const s = blank();
+    const statistics = s.requirements.find(r => r.id === "gen-mat240").options.find(o => o.provider === "Sophia" && o.sourceUrl.includes("/experiences/"));
+    const accounting = s.requirements.find(r => r.id === "core-acc201").options.find(o => o.provider === "Sophia" && o.sourceUrl.includes("/experiences/"));
+    eq(statistics.verification, "Confirmed");
+    eq(accounting.verification, "Confirmed");
+    ok(accounting.sourceUrl.includes("snhu.edu"), "official source URL missing");
+  });
+  test("Sophia-heavy free-elective selections do not reuse the same course", () => {
+    const s = DegreeEngine.generatePlan(blank(), "sophia-heavy");
+    const codes = s.requirements.filter(r => r.category === "free" && DegreeEngine.optionFor(r)?.provider === "Sophia" && DegreeEngine.optionFor(r).code !== "ENTER COURSE").map(r => DegreeEngine.optionFor(r).code);
+    ok(codes.length >= 7, "too few official free-elective choices were used");
+    eq(new Set(codes).size, codes.length);
+  });
   test("Generated scenarios retain per-requirement statuses", () => {
     const s = DegreeEngine.generatePlan(blank(), "sophia-heavy"), scenario = s.scenarios[0];
     ok(Object.keys(scenario.statuses).length > 0, "scenario statuses were not stored");

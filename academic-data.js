@@ -51,6 +51,55 @@
     });
     return requirements;
   }
+  const sophiaUrl = id => `https://www.snhu.edu/admission/transferring-credits/work-life-experience#/experiences/${id}`;
+  const officialSophia = [
+    ["gen-eng190", "H1hP7SHqD", "English Composition II", "ENG 190", "Confirmed"],
+    ["gen-eng190", "HJ1StmJCO", "Workplace Writing II", "ENG 190", "Confirmed"],
+    ["gen-mat240", "HJbtBCgAL", "Introduction to Statistics", "MAT 240", "Confirmed"],
+    ["gen-eeth", "BkUESCxA8", "Introduction to Ethics", "PHL 212", "Likely"],
+    ["gen-ehps", "r1sgI0xCI", "United States History I", "HIS 113", "Likely"],
+    ["gen-ehps", "HklMI0gAL", "United States History II", "HIS 114", "Likely"],
+    ["gen-eco201", "ry2iHAgAU", "Microeconomics", "ECO 201", "Confirmed"],
+    ["gen-eco202", "rJ9qr0eR8", "Macroeconomics", "ECO 202", "Confirmed"],
+    ["core-acc201", "H1g9-6M8j", "Financial Accounting", "ACC 201", "Confirmed"],
+    ["core-acc202", "rJqa7XQuT", "Managerial Accounting", "ACC 202", "Confirmed"],
+    ["core-bus206", "B1E2fHH9w", "Business Law", "BUS 206", "Confirmed"],
+    ["core-fin320", "B12n7rH5D", "Principles of Finance", "FIN 320", "Confirmed"]
+  ];
+  const sophiaFreeElectives = [
+    ["rkCXlJ13q", "Principles of Management", "OL 215"],
+    ["HyVfT8dfzl", "Principles of Leadership", "OL 328"],
+    ["ryqmEb3cA", "Principles of Marketing", "MKT 3ELE"],
+    ["By1HsYZ0q", "Business Communication", "ENG 220"],
+    ["Skc3LDRDj", "Critical Thinking", "PHL 111"],
+    ["rJMWJI-tO", "Introduction to Relational Databases", "CS 231"],
+    ["HJDSB0e0L", "Introduction to Information Technology", "IT 200"],
+    ["SJJTrRgRU", "Project Management", "QSO 340"]
+  ];
+  function ensureOfficialSophiaOptions(requirements) {
+    officialSophia.forEach(([requirementId, recordId, title, equivalent, verification]) => {
+      const r = requirements.find(x => x.id === requirementId);
+      if (!r) return;
+      const id = `${requirementId}-sophia-${recordId}`;
+      if (!r.options.some(o => o.id === id)) r.options.push(option(id, "Sophia", title, title, verification, {
+        snhuEquivalent: equivalent, sourceUrl: sophiaUrl(recordId), effectiveDate: "2026-07-25",
+        baselineHours: 25, expectedDays: 30, notes: verification === "Confirmed" ? "Direct equivalency listed by SNHU." : "SNHU equivalency is listed; confirm that its requirement-area placement applies to this catalog."
+      }));
+    });
+    requirements.filter(r => r.category === "free" && !r.completedBy).forEach(r => {
+      sophiaFreeElectives.forEach(([recordId, title, equivalent]) => {
+        const id = `${r.id}-sophia-free-${recordId}`;
+        if (!r.options.some(o => o.id === id)) r.options.push(option(id, "Sophia", title, title, "Likely", {
+          snhuEquivalent: equivalent, sourceUrl: sophiaUrl(recordId), effectiveDate: "2026-07-25",
+          baselineHours: 25, expectedDays: 30, notes: "SNHU lists this course equivalency. Free-elective placement remains subject to the degree evaluation and transfer ceiling."
+        }));
+      });
+    });
+    return requirements;
+  }
+  function ensureProviderOptions(requirements) {
+    return ensureOfficialSophiaOptions(ensureProviderCandidates(requirements));
+  }
 
   function createRequirements() {
     const completed = [
@@ -119,7 +168,7 @@
         options: [snhu(id, "ELECTIVE", `SNHU free elective ${n}`)]
       });
     });
-    return ensureProviderCandidates([...completed, ...gen, ...core, ...mis, ...free]);
+    return ensureProviderOptions([...completed, ...gen, ...core, ...mis, ...free]);
   }
 
   function blank() {
@@ -181,5 +230,5 @@
     return state;
   }
 
-  window.DegreeData = { blank, demo, seed: blank, option, requirement, ensureProviderCandidates, categories: { gened: "General Education · The Commons", core: "Business Core", mis: "MIS Concentration", free: "Free Electives" } };
+  window.DegreeData = { blank, demo, seed: blank, option, requirement, ensureProviderOptions, categories: { gened: "General Education · The Commons", core: "Business Core", mis: "MIS Concentration", free: "Free Electives" } };
 })();

@@ -34,7 +34,7 @@
   function migrate(old) {
     if (old?.schemaVersion === 4) {
       const next = clone(old);
-      window.DegreeData.ensureProviderCandidates(next.requirements);
+      window.DegreeData.ensureProviderOptions(next.requirements);
       next.scenarios?.forEach(s => { s.statuses ||= {}; });
       return next;
     }
@@ -56,7 +56,7 @@
           if (o.verification === "Rejected") o.verification = "Not eligible";
         });
       });
-      window.DegreeData.ensureProviderCandidates(next.requirements);
+      window.DegreeData.ensureProviderOptions(next.requirements);
       next.scenarios?.forEach(s => { s.statuses ||= {}; });
       const defaults = window.DegreeData.blank().settings;
       next.settings = { ...defaults, ...(next.settings || {}), providers: { ...defaults.providers, ...(next.settings?.providers || {}) } };
@@ -120,7 +120,10 @@
     const warnings = [];
     const assignmentKeys = new Set(), duplicateAssignments = [];
     path.forEach(r => {
-      const o = opt(r), key = o.credentialId ? `credential:${o.credentialId}` : `option:${o.id}`;
+      const o = opt(r);
+      const reusablePlaceholder = /^(ENTER COURSE|ELECTIVE)$/i.test(o.code || "");
+      const key = o.credentialId ? `credential:${o.credentialId}` :
+        o.provider !== "SNHU" && !reusablePlaceholder ? `provider-course:${o.provider}:${String(o.code).toLowerCase()}` : `option:${o.id}`;
       if (assignmentKeys.has(key)) duplicateAssignments.push(key);
       assignmentKeys.add(key);
     });
@@ -164,7 +167,17 @@
       let choices = r.options.filter(o => !scenario?.exclusions.includes(o.id) && o.verification !== "Not eligible");
       if (mode === "conservative") choices = choices.filter(o => o.verification === "Confirmed");
       if (!choices.length) return;
-      choices.sort((a, b) => score(a, mode, next, counts) - score(b, mode, next, counts) || a.id.localeCompare(b.id));
+      const confidence = o => ({ Confirmed: 0, Likely: 1, Unverified: 2, "Advisor confirmation required": 3 }[o.verification] ?? 4);
+      const usedKeys = new Set(next.requirements.filter(selected).filter(x => x.id !== r.id).map(x => {
+        const chosen = opt(x), placeholder = /^(ENTER COURSE|ELECTIVE)$/i.test(chosen?.code || "");
+        return chosen?.provider !== "SNHU" && !placeholder ? `${chosen.provider}:${String(chosen.code).toLowerCase()}` : "";
+      }).filter(Boolean));
+      choices = choices.filter(o => {
+        const placeholder = /^(ENTER COURSE|ELECTIVE)$/i.test(o.code || "");
+        return o.provider === "SNHU" || placeholder || !usedKeys.has(`${o.provider}:${String(o.code).toLowerCase()}`);
+      });
+      choices.sort((a, b) => score(a, mode, next, counts) - score(b, mode, next, counts) || confidence(a) - confidence(b) || a.id.localeCompare(b.id));
+      if (!choices.length) return;
       r.selectedOptionId = choices[0].id; r.status = "Planned"; counts[choices[0].provider] = (counts[choices[0].provider] || 0) + 1;
     });
     // Enforce residency using major SNHU courses first, then other SNHU courses.
