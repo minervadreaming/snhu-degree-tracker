@@ -12,10 +12,28 @@ Desktop.ini
 *.csv
 *.json
 *.pdf
+private-data/
+local-backups/
+imports/
+private-seeds/
+.privacy-patterns.local
+.privacy-replacements.local
+*.degree-plan.json
+*transfer*evaluation*
+*academic*evaluation*
+!docs/*.example.json
+
+# Local environment and generated analysis
+.env
+.env.*
+!.env.example
+privacy-scan-report.txt
+parse-output/
+dist/
+build/
 
 # Temporary files
 *.tmp
 *.temp
 *.bak
 *~
-

@@ -1,0 +1,9 @@
+{
+  "purpose": "Fictional local-development example only",
+  "student": {
+    "name": "Sample Learner",
+    "studentId": "",
+    "institution": "Example University"
+  },
+  "notes": "Copy private working data only into private-data/local-profile.json. Production code does not load that path."
+}
