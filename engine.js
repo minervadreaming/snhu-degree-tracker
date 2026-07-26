@@ -201,7 +201,7 @@
   function estimate(state) {
     const rs = state.requirements.filter(r => selected(r) && r.status !== "Completed"), providers = state.settings.providers;
     let cost = (+state.settings.booksMaterials || 0) + (+state.settings.transferEvaluationFees || 0) + (+state.settings.miscellaneousCosts || 0), days = 0, hours = 0, touchstones = 0;
-    const subscriptions = {};
+    const subscriptionDays = {};
     rs.forEach(r => {
       const o = opt(r), p = providers[o.provider] || {};
       const familiarity = { "New material": 1, "Some familiarity": .9, "Strong familiarity": .75, "Mostly review": .6 }[o.familiarity] || 1;
@@ -210,12 +210,16 @@
       touchstones += +o.touchstones || 0;
       if (o.cost != null) cost += +o.cost;
       else if (p.pricingModel === "perCredit") cost += (+p.price || 0) * (+o.credits || 0);
-      else if (p.pricingModel === "subscription") subscriptions[o.provider] = Math.max(subscriptions[o.provider] || 0, Math.ceil(days / (+p.periodDays || 30)));
+      else if (p.pricingModel === "subscription") subscriptionDays[o.provider] = (subscriptionDays[o.provider] || 0) + (o.expectedDays ?? o.days ?? state.settings.defaultCourseDays) + (o.gradingDelayDays || 0);
       else cost += +p.price || 0;
       cost += +p.examFee || 0;
     });
-    Object.entries(subscriptions).forEach(([name, periods]) => { cost += periods * (+providers[name].price || 0); });
     const concurrency = Math.max(1, +state.settings.concurrentCourses || 1), expected = Math.ceil(days / concurrency);
+    Object.entries(subscriptionDays).forEach(([name, providerDays]) => {
+      const periodDays = +providers[name].periodDays || 30;
+      const periods = Math.max(1, Math.ceil(providerDays / (periodDays * concurrency)));
+      cost += periods * (+providers[name].price || 0);
+    });
     return { cost, hours, touchstones, aggressiveDays: Math.ceil(expected * .75), expectedDays: expected, conservativeDays: Math.ceil(expected * 1.35) };
   }
 

@@ -93,6 +93,20 @@
     ok((a.byProvider["Study.com"]?.selected || 0) > 0, "Study.com-heavy plan selected no Study.com credits");
     eq(a.pathStatus, "Provisional");
   });
+  test("SNHU per-credit pricing changes remaining-cost estimates", () => {
+    const s = DegreeEngine.generatePlan(blank(), "snhu-heavy");
+    eq(DegreeEngine.estimate(s).cost, 0);
+    s.settings.providers.SNHU.price = 100;
+    eq(DegreeEngine.estimate(s).cost, 12000);
+  });
+  test("Sophia monthly pricing changes scenario cost estimates", () => {
+    const s = DegreeEngine.generatePlan(blank(), "sophia-heavy");
+    s.settings.providers.SNHU.price = 100;
+    const before = DegreeEngine.estimate(s).cost;
+    s.settings.providers.Sophia.price = 99;
+    const after = DegreeEngine.estimate(s).cost;
+    ok(after > before, "Sophia subscription price did not affect cost");
+  });
   test("Official SNHU Sophia mappings replace generic placeholders when available", () => {
     const s = blank();
     const statistics = s.requirements.find(r => r.id === "gen-mat240").options.find(o => o.provider === "Sophia" && o.sourceUrl.includes("/experiences/"));

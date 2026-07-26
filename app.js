@@ -241,7 +241,12 @@
 
   function renderSettings() {
     q("#providerSettings").innerHTML = Object.entries(state.settings.providers).map(([name, p]) => `<article class="panel provider-setting" data-provider="${esc(name)}"><h2>${esc(name)}</h2><label>Pricing model<select data-setting="pricingModel"><option value="perCredit" ${p.pricingModel === "perCredit" ? "selected" : ""}>Per credit</option><option value="perCourse" ${p.pricingModel === "perCourse" ? "selected" : ""}>Per course</option><option value="subscription" ${p.pricingModel === "subscription" ? "selected" : ""}>Subscription period</option></select></label><label>Price ($)<input data-setting="price" type="number" min="0" step=".01" value="${p.price}"></label>${p.pricingModel === "subscription" ? `<label>Period days<input data-setting="periodDays" type="number" min="1" value="${p.periodDays || 30}"></label>` : ""}<label>Exam fee per course<input data-setting="examFee" type="number" min="0" value="${p.examFee || 0}"></label><label>Effective date<input data-setting="effectiveDate" type="date" value="${esc(p.effectiveDate)}"></label><label>Source URL<input data-setting="sourceUrl" type="url" value="${esc(p.sourceUrl)}"></label></article>`).join("");
-    qa(".provider-setting").forEach(card => qa("[data-setting]", card).forEach(el => el.onchange = e => { const p = state.settings.providers[card.dataset.provider]; p[e.target.dataset.setting] = e.target.type === "number" ? +e.target.value : e.target.value; save(); renderSettings(); }));
+    qa(".provider-setting").forEach(card => qa("[data-setting]", card).forEach(el => el.onchange = e => {
+      const p = state.settings.providers[card.dataset.provider];
+      p[e.target.dataset.setting] = e.target.type === "number" ? +e.target.value : e.target.value;
+      save();
+      render();
+    }));
     q("#defaultHours").value = state.settings.defaultCourseHours; q("#defaultDays").value = state.settings.defaultCourseDays; q("#concurrency").value = state.settings.concurrentCourses;
     q("#booksMaterials").value = state.settings.booksMaterials || 0; q("#transferFees").value = state.settings.transferEvaluationFees || 0; q("#miscCosts").value = state.settings.miscellaneousCosts || 0;
     q("#profileName").value = state.student.name || ""; q("#profileCatalog").value = state.student.catalog || "";
