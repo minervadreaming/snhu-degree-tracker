@@ -10,9 +10,15 @@
   let migrated = loaded.migrated;
   function save() {
     if (!initialized) return;
+    const scenario = state.scenarios?.find(s => s.id === state.activeScenarioId);
+    if (scenario) {
+      scenario.selections = Object.fromEntries(state.requirements.filter(DegreeEngine.selected).map(r => [r.id, r.selectedOptionId]));
+      scenario.statuses = Object.fromEntries(state.requirements.filter(DegreeEngine.selected).map(r => [r.id, r.status]));
+    }
     state.meta.updatedAt = new Date().toISOString();
     DegreePrivacy.save(localStorage, state);
   }
+  function commitAndRender() { save(); render(); }
   const activeScenario = () => state.scenarios.find(s => s.id === state.activeScenarioId) || state.scenarios[0];
 
   function setTab(tab) {
@@ -27,7 +33,7 @@
     if (field === "selectedOptionId") r.status = value ? (r.status === "Available" ? "Planned" : r.status) : "Available";
     if (field === "status" && !["Planned","In Progress","Completed"].includes(value)) r.selectedOptionId = "";
     if (field === "status" && ["Planned","In Progress","Completed"].includes(value) && !r.selectedOptionId) r.selectedOptionId = r.options[0]?.id || "";
-    save(); render();
+    commitAndRender();
   }
 
   function renderOverview() {
@@ -75,10 +81,14 @@
       <p class="hint">The tracker will not double-count this credential. It remains provisional until SNHU confirms the equivalency and placement.</p>`;
     q("#credentialEquiv").onchange = applyCredential;
     q("#credentialReq").onchange = applyCredential;
-    q("#credentialEvidence").onchange = e => { c.evidence = e.target.value; save(); };
-    q("#credentialName").onchange = e => { c.name = e.target.value; save(); };
-    q("#credentialIssuer").onchange = e => { c.issuer = e.target.value; save(); };
-    q("#credentialCandidates").onchange = e => { c.candidateEquivalencies = e.target.value.split(",").map(x => x.trim()).filter(Boolean); if (!c.candidateEquivalencies.includes(c.equivalency)) c.equivalency = ""; save(); render(); };
+    q("#credentialEvidence").onchange = e => { c.evidence = e.target.value; commitAndRender(); };
+    q("#credentialName").onchange = e => {
+      c.name = e.target.value;
+      state.requirements.flatMap(r => r.options).filter(o => o.credentialId === c.id).forEach(o => { o.title = c.name || "Professional credential credit"; });
+      commitAndRender();
+    };
+    q("#credentialIssuer").onchange = e => { c.issuer = e.target.value; commitAndRender(); };
+    q("#credentialCandidates").onchange = e => { c.candidateEquivalencies = e.target.value.split(",").map(x => x.trim()).filter(Boolean); if (!c.candidateEquivalencies.includes(c.equivalency)) c.equivalency = ""; commitAndRender(); };
   }
   function applyCredential() {
     const c = state.credentials[0], old = c.appliedRequirementId;
@@ -93,7 +103,7 @@
       r.options.push(DegreeData.option(id, "Credential", c.equivalency, c.name || "Professional credential credit", c.verification, { credentialId: c.id, credits: +c.credits }));
       r.selectedOptionId = id; r.status = "Planned";
     }
-    save(); render();
+    commitAndRender();
   }
 
   function renderRequirements() {
@@ -148,24 +158,28 @@
       qa("[data-field]", row).forEach(el => el.onchange = e => updateRequirement(row.dataset.id, e.target.dataset.field, e.target.value));
       qa("[data-option]", row).forEach(optionRow => qa("[data-opt-field]", optionRow).forEach(el => el.onchange = e => {
         const r = state.requirements.find(x => x.id === row.dataset.id), o = r.options.find(x => x.id === optionRow.dataset.option);
-        o[e.target.dataset.optField] = e.target.type === "number" ? Math.max(0, +e.target.value || 0) : e.target.value;
+        const field = e.target.dataset.optField;
+        const nullableNumbers = ["cost", "baselineHours", "hours", "minimumDays", "expectedDays"];
+        o[field] = e.target.type === "number"
+          ? (e.target.value === "" && nullableNumbers.includes(field) ? null : Math.max(0, +e.target.value || 0))
+          : e.target.value;
         o.residencyEligible = o.provider === "SNHU"; o.majorResidencyEligible = o.provider === "SNHU";
-        save(); render();
+        commitAndRender();
       }));
       qa("[data-option]", row).forEach(optionRow => {
         q("[data-exclude]", optionRow).onchange = e => {
           const s = activeScenario(), id = optionRow.dataset.option;
           s.exclusions = e.target.checked ? [...new Set([...s.exclusions, id])] : s.exclusions.filter(x => x !== id);
-          save();
+          commitAndRender();
         };
       });
       q(".add-option", row).onclick = () => {
         const r = state.requirements.find(x => x.id === row.dataset.id), id = `${r.id}-custom-${Date.now()}`;
         r.options.push(DegreeData.option(id, "Transfer", r.category === "free" ? "ELECTIVE" : "COURSE", r.category === "free" ? "Editable free elective" : `Possible ${r.name} equivalent`, "Unverified"));
-        r.selectedOptionId = id; if (r.status === "Available") r.status = "Planned"; save(); render();
+        r.selectedOptionId = id; if (r.status === "Available") r.status = "Planned"; commitAndRender();
       };
       q("[data-lock]", row).onchange = e => {
-        const s = activeScenario(); s.locks = e.target.checked ? [...new Set([...s.locks, row.dataset.id])] : s.locks.filter(x => x !== row.dataset.id); save();
+        const s = activeScenario(); s.locks = e.target.checked ? [...new Set([...s.locks, row.dataset.id])] : s.locks.filter(x => x !== row.dataset.id); commitAndRender();
       };
     });
   }
@@ -236,7 +250,7 @@
 
   function renderQueue() {
     q("#queue").innerHTML = state.verificationQueue.map(item => `<article class="queue-item" data-id="${item.id}"><div><span class="badge ${item.status === "Resolved" ? "valid" : "review"}">${esc(item.status)}</span><h3>${esc(item.question)}</h3></div><label>Status<select data-q="status"><option ${item.status === "Open" ? "selected" : ""}>Open</option><option ${item.status === "Waiting" ? "selected" : ""}>Waiting</option><option ${item.status === "Resolved" ? "selected" : ""}>Resolved</option></select></label><label>Date answered<input data-q="dateAnswered" type="date" value="${esc(item.dateAnswered)}"></label><label>Advisor answer<textarea data-q="answer" rows="2">${esc(item.answer)}</textarea></label><label>Evidence / source<input data-q="evidence" value="${esc(item.evidence)}"></label><label>Resulting data changes<input data-q="resultingChanges" value="${esc(item.resultingChanges)}"></label><label>Affected requirement<select data-q="affectedRequirementId"><option value="">None linked</option>${state.requirements.map(r => `<option value="${r.id}" ${item.affectedRequirementId === r.id ? "selected" : ""}>${esc(r.code)} · ${esc(r.name)}</option>`).join("")}</select></label></article>`).join("");
-    qa(".queue-item").forEach(row => qa("[data-q]", row).forEach(el => el.onchange = e => { const item = state.verificationQueue.find(x => x.id === row.dataset.id); item[e.target.dataset.q] = e.target.value; item.updatedAt = new Date().toISOString(); save(); }));
+    qa(".queue-item").forEach(row => qa("[data-q]", row).forEach(el => el.onchange = e => { const item = state.verificationQueue.find(x => x.id === row.dataset.id); item[e.target.dataset.q] = e.target.value; item.updatedAt = new Date().toISOString(); commitAndRender(); }));
   }
 
   function renderSettings() {
@@ -244,8 +258,7 @@
     qa(".provider-setting").forEach(card => qa("[data-setting]", card).forEach(el => el.onchange = e => {
       const p = state.settings.providers[card.dataset.provider];
       p[e.target.dataset.setting] = e.target.type === "number" ? +e.target.value : e.target.value;
-      save();
-      render();
+      commitAndRender();
     }));
     q("#defaultHours").value = state.settings.defaultCourseHours; q("#defaultDays").value = state.settings.defaultCourseDays; q("#concurrency").value = state.settings.concurrentCourses;
     q("#booksMaterials").value = state.settings.booksMaterials || 0; q("#transferFees").value = state.settings.transferEvaluationFees || 0; q("#miscCosts").value = state.settings.miscellaneousCosts || 0;
@@ -300,7 +313,16 @@
   }
 
   qa("[data-tab]").forEach(b => b.onclick = () => setTab(b.dataset.tab));
-  q("#categoryFilter").onchange = renderRequirements; q("#statusFilter").onchange = renderRequirements;
+  q("#categoryFilter").onchange = event => {
+    state.ui.category = event.target.value;
+    save();
+    renderRequirements();
+  };
+  q("#statusFilter").onchange = event => {
+    state.ui.filter = event.target.value;
+    save();
+    renderRequirements();
+  };
   q("#generateBtn").onclick = () => { state = DegreeEngine.generatePlan(state, q("#plannerMode").value); save(); render(); };
   q("#newScenarioBtn").onclick = () => { snapshotScenario(activeScenario()); duplicateScenario(state.activeScenarioId); };
   qa("[data-preset]").forEach(button => button.onclick = () => createPreset(button.dataset.preset));
@@ -322,9 +344,9 @@
     if (!confirm("Delete all Degree Compass data from this browser only? This cannot be undone without an exported backup.")) return;
     DegreePrivacy.deleteAll(localStorage); initialized = false; state = DegreeData.blank(); render(); q("#firstRunDialog").showModal();
   };
-  q("#profileName").onchange = e => { state.student.name = e.target.value; save(); renderOverview(); };
-  q("#profileCatalog").onchange = e => { state.student.catalog = e.target.value; save(); renderOverview(); };
-  q("#profileStudentId").onchange = e => { state.student.studentId = e.target.value; save(); };
+  q("#profileName").onchange = e => { state.student.name = e.target.value; commitAndRender(); };
+  q("#profileCatalog").onchange = e => { state.student.catalog = e.target.value; commitAndRender(); };
+  q("#profileStudentId").onchange = e => { state.student.studentId = e.target.value; commitAndRender(); };
   q("#toggleStudentId").onclick = () => { state.ui.studentIdVisible = !state.ui.studentIdVisible; save(); renderSettings(); };
   [["defaultHours", "defaultCourseHours"], ["defaultDays", "defaultCourseDays"], ["concurrency", "concurrentCourses"]].forEach(([id, key]) => q(`#${id}`).onchange = e => { state.settings[key] = Math.max(1, +e.target.value || 1); save(); render(); });
   [["booksMaterials", "booksMaterials"], ["transferFees", "transferEvaluationFees"], ["miscCosts", "miscellaneousCosts"]].forEach(([id, key]) => q(`#${id}`).onchange = e => { state.settings[key] = Math.max(0, +e.target.value || 0); save(); render(); });

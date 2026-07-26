@@ -107,6 +107,27 @@
     const after = DegreeEngine.estimate(s).cost;
     ok(after > before, "Sophia subscription price did not affect cost");
   });
+  test("Course credits, provider defaults, and cost overrides recalculate together", () => {
+    const s = blank(), r = s.requirements.find(x => x.id === "core-acc201"), o = r.options.find(x => x.provider === "SNHU");
+    r.selectedOptionId = o.id; r.status = "Planned"; s.settings.providers.SNHU.price = 100;
+    eq(DegreeEngine.estimate(s).cost, 300);
+    o.credits = 6; eq(DegreeEngine.audit(s).selectedCredits, 6); eq(DegreeEngine.estimate(s).cost, 600);
+    o.cost = 50; eq(DegreeEngine.estimate(s).cost, 50);
+    o.cost = null; eq(DegreeEngine.estimate(s).cost, 600);
+  });
+  test("Time, familiarity, grading delay, minimum days, and concurrency recalculate", () => {
+    const s = blank(), r = s.requirements[0], o = r.options[0];
+    r.selectedOptionId = o.id; r.status = "Planned"; o.baselineHours = 40; o.familiarity = "Mostly review";
+    o.expectedDays = 20; o.minimumDays = 25; o.gradingDelayDays = 5; s.settings.concurrentCourses = 1;
+    let e = DegreeEngine.estimate(s); eq(e.hours, 24); eq(e.expectedDays, 25); eq(e.aggressiveDays, 30);
+    s.settings.concurrentCourses = 2; e = DegreeEngine.estimate(s); eq(e.expectedDays, 13); eq(e.aggressiveDays, 15);
+  });
+  test("Fees and miscellaneous settings recalculate estimated remaining cost", () => {
+    const s = blank(), r = s.requirements[0], o = r.options[0];
+    r.selectedOptionId = o.id; r.status = "Planned"; s.settings.providers.SNHU.examFee = 25;
+    s.settings.booksMaterials = 30; s.settings.transferEvaluationFees = 20; s.settings.miscellaneousCosts = 10;
+    eq(DegreeEngine.estimate(s).cost, 85);
+  });
   test("Official SNHU Sophia mappings replace generic placeholders when available", () => {
     const s = blank();
     const statistics = s.requirements.find(r => r.id === "gen-mat240").options.find(o => o.provider === "Sophia" && o.sourceUrl.includes("/experiences/"));

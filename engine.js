@@ -200,13 +200,14 @@
 
   function estimate(state) {
     const rs = state.requirements.filter(r => selected(r) && r.status !== "Completed"), providers = state.settings.providers;
-    let cost = (+state.settings.booksMaterials || 0) + (+state.settings.transferEvaluationFees || 0) + (+state.settings.miscellaneousCosts || 0), days = 0, hours = 0, touchstones = 0;
+    let cost = (+state.settings.booksMaterials || 0) + (+state.settings.transferEvaluationFees || 0) + (+state.settings.miscellaneousCosts || 0), days = 0, minimumDays = 0, hours = 0, touchstones = 0;
     const subscriptionDays = {};
     rs.forEach(r => {
       const o = opt(r), p = providers[o.provider] || {};
       const familiarity = { "New material": 1, "Some familiarity": .9, "Strong familiarity": .75, "Mostly review": .6 }[o.familiarity] || 1;
       hours += o.hours ?? Math.ceil((o.baselineHours ?? state.settings.defaultCourseHours) * familiarity);
       days += (o.expectedDays ?? o.days ?? state.settings.defaultCourseDays) + (o.gradingDelayDays || 0);
+      minimumDays += (o.minimumDays ?? 0) + (o.gradingDelayDays || 0);
       touchstones += +o.touchstones || 0;
       if (o.cost != null) cost += +o.cost;
       else if (p.pricingModel === "perCredit") cost += (+p.price || 0) * (+o.credits || 0);
@@ -220,7 +221,8 @@
       const periods = Math.max(1, Math.ceil(providerDays / (periodDays * concurrency)));
       cost += periods * (+providers[name].price || 0);
     });
-    return { cost, hours, touchstones, aggressiveDays: Math.ceil(expected * .75), expectedDays: expected, conservativeDays: Math.ceil(expected * 1.35) };
+    const aggressive = Math.max(Math.ceil(minimumDays / concurrency), Math.ceil(expected * .75));
+    return { cost, hours, touchstones, aggressiveDays: aggressive, expectedDays: expected, conservativeDays: Math.ceil(expected * 1.35) };
   }
 
   function sequence(state) {
